@@ -8,7 +8,7 @@ class PostBehaviorTransition:
 
 class SamePairBehaviorTransition:
     
-    def __init__(self, sample_id, pre_event, event, max_delay=0, max_ignored_quiet_time=math.inf):
+    def __init__(self, sample_id, pre_event, event, max_delay=0, max_ignored_quiet_time=float("inf")):
         self.sample_id = sample_id
         self.pre_event = pre_event
         self.event = event
