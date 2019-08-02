@@ -30,34 +30,34 @@ sample_data = get_sample_data()
 # ]
 
 def count_cell_filterpatterns(sample_data, cell, filter_pattern):
-cell_trace_configs = [
+    cell_trace_configs = [
         CellTraceConfig(sample_id, cell, "quiet", filter_pattern) for sample_id in sample_data
-]  # if all samples should be included, you have
-# to chose 'quiet' as event
+    ]  # if all samples should be included, you have
+    # to chose 'quiet' as event
 
-# ALL THIS DOES IS FILTER ALL SAMPLES BY CELL_TRACE_CONFIGS
-# FILTER OPERATION
-number_basins = []
-sample_ids = []
-for ctc in cell_trace_configs:
-    sample_df = sample_data.get(ctc.sample_id)
-    if sample_df is None:
-        raise ValueError("{}: could not find sample data".format(ctc.sample_id))
-    # Extract columns matching our cell type and the optional filter pattern.
-    cell_subset_df = sample_df.filter(
-        regex=ctc.get_filter_regex()
-    )  # Get subset of cells
-    number = len(cell_subset_df.columns)
-    number_basins.append(number)
-    sample_ids.append(ctc.sample_id)
-avg = np.mean(number_basins)
-total = np.sum(number_basins)
+    # ALL THIS DOES IS FILTER ALL SAMPLES BY CELL_TRACE_CONFIGS
+    # FILTER OPERATION
+    number_basins = []
+    sample_ids = []
+    for ctc in cell_trace_configs:
+        sample_df = sample_data.get(ctc.sample_id)
+        if sample_df is None:
+            raise ValueError("{}: could not find sample data".format(ctc.sample_id))
+        # Extract columns matching our cell type and the optional filter pattern.
+        cell_subset_df = sample_df.filter(
+            regex=ctc.get_filter_regex()
+        )  # Get subset of cells
+        number = len(cell_subset_df.columns)
+        number_basins.append(number)
+        sample_ids.append(ctc.sample_id)
+    avg = np.mean(number_basins)
+    total = np.sum(number_basins)
     logging.info(total)
-# print(len(number_basins))
-# print(list(zip(sample_ids, number_basins)))
+    # print(len(number_basins))
+    # print(list(zip(sample_ids, number_basins)))
     logging.info(avg)
 
-print(avg)
+count_cell_filterpatterns(sample_data, "basin", "A4L")
 
 #%%
 # TODO: this should probably be a function (extract time windows)
