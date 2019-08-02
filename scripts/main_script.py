@@ -468,7 +468,6 @@ transition_types = [
 
 print(transition_types)
 #%%
-%matplotlib notebook 
 
 # For multiple transition types!! 
 # If a dataframe with NANs is plotted (raw-data = non interpolated), use 
@@ -508,7 +507,6 @@ aligned_layout_plot(sub2, legend=True)
 
 #%%
 # To make the plot in the notebook and not in an extra window
-%matplotlib notebook 
 
 # Only for one type of transitions (I still need this!!)
 
