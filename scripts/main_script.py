@@ -29,8 +29,9 @@ sample_data = get_sample_data()
 #    CellTraceConfig('17-08-26L6-cl', 'basin', 'quiet', 'A2')
 # ]
 
+def count_cell_filterpatterns(sample_data, cell, filter_pattern):
 cell_trace_configs = [
-    CellTraceConfig(sample_id, "basin", "quiet", "A4L") for sample_id in sample_data
+        CellTraceConfig(sample_id, cell, "quiet", filter_pattern) for sample_id in sample_data
 ]  # if all samples should be included, you have
 # to chose 'quiet' as event
 
@@ -51,9 +52,11 @@ for ctc in cell_trace_configs:
     sample_ids.append(ctc.sample_id)
 avg = np.mean(number_basins)
 total = np.sum(number_basins)
-print(total)
+    logging.info(total)
 # print(len(number_basins))
 # print(list(zip(sample_ids, number_basins)))
+    logging.info(avg)
+
 print(avg)
 
 #%%
