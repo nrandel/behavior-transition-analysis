@@ -124,7 +124,7 @@ def find_behavior_next(sample_id, sample_df, first_event, second_event, max_dela
     Assumption: No overlapp
     Not in data sets identified
     """
-    
+
     print("finding same behaviors only")
     
     results = []
@@ -233,3 +233,10 @@ def find_behavior_next(sample_id, sample_df, first_event, second_event, max_dela
         quiet_event_end_time = None
             
     return results
+
+def get_unrelated_nonquiet_behaviors(excluding=[]):
+    if 'turn' in excluding:
+        turn_behaviors = ['left turn', 'right turn']
+        turn_behaviors.extend(excluding)
+        excluding = turn_behaviors
+    return [ab for ab in available_behaviors if ab not in excluding]
