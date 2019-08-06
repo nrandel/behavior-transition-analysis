@@ -53,8 +53,6 @@ def count_cell_filterpatterns(sample_data, cell, filter_pattern):
     avg = np.mean(number_basins)
     total = np.sum(number_basins)
     logging.info(total)
-    # print(len(number_basins))
-    # print(list(zip(sample_ids, number_basins)))
     logging.info(avg)
 
 count_cell_filterpatterns(sample_data, "basin", "A4L")
@@ -75,14 +73,38 @@ cell_trace_configs = [
 # Load all samples with specific filter pattern
 """
 cell_trace_configs = [
-    CellTraceConfig(name,'A00c', 'fw') for name in lm_data]
+    CellTraceConfig(name,'A00c', 'fw') for name in sample_data]
 """
 
 all_events = []  # List of events, with raw dff data (no interpolation or other
 # processing done at this point). Sample_id is added to the cell name.
 
+def cell_trace_config_filter(sample_data, ctcs):
+    """
+    Extract columns matching our cell type and the optional filter pattern.
+    """
+    filtered_data = {}
+    for ctc in cell_trace_configs:
+        sample_df = sample_data.get(ctc.sample_id)
+        if sample_df is None:
+            raise ValueError("{}: could not find sample data".format(ctc.sample_id))
+        cell_subset_df = sample_df.filter(
+            regex=ctc.get_filter_regex()
+        )
+        # set index = time, then reset index and make time a colum
+        # should be the same as cell_subset_df["time"] = sample_df["time"]
+        cell_subset_df.set_index(
+            sample_df.time, inplace=True
+        )
+        cell_subset_df.reset_index(inplace=True)
+        filtered_data[ctc.sample_id] = cell_subset_df
+    return filtered_data
+
+    
+
 # EXTRACT TIME WINDOWS
 # FILTER OPERATION
+# TODO: split filtering and window extraction
 for ctc in cell_trace_configs:
     # print(sample_df.keys)
     # break
@@ -289,16 +311,16 @@ behavior_transitions = [
 
 # Open all samples single Transitions
 #behavior_transitions = [
-#    PostBehaviorTransition(name, 'stim', 'fw', 4.9) for name in lm_data]
+#    PostBehaviorTransition(name, 'stim', 'fw', 4.9) for name in sample_data]
 
 '''
 # Open all samples multiple Transitions
 behavior_transitions = [
-    PostBehaviorTransition(name, 'fw', 'stim', 4.9) for name in lm_data] + [
-    PostBehaviorTransition(name, 'bw', 'stim', 4.9) for name in lm_data] + [
-    PostBehaviorTransition(name, 'turn', 'stim', 4.9) for name in lm_data] + [
-    PostBehaviorTransition(name, 'hunch', 'stim', 4.9) for name in lm_data] + [
-    PostBehaviorTransition(name, 'other', 'stim', 4.9) for name in lm_data]
+    PostBehaviorTransition(name, 'fw', 'stim', 4.9) for name in sample_data] + [
+    PostBehaviorTransition(name, 'bw', 'stim', 4.9) for name in sample_data] + [
+    PostBehaviorTransition(name, 'turn', 'stim', 4.9) for name in sample_data] + [
+    PostBehaviorTransition(name, 'hunch', 'stim', 4.9) for name in sample_data] + [
+    PostBehaviorTransition(name, 'other', 'stim', 4.9) for name in sample_data]
 '''
 
 found_transitions = []
@@ -385,6 +407,7 @@ right_half_window_size = 42.4
 windows = []
 n_behavior_per_sample = {}
 
+# TODO: Split filter data and extract windows
 for ctc in tqdm(cell_Ptrans_configs):
     sample_df = sample_data.get(ctc.sample_id)
     n_behavior = n_behavior_per_sample.get(ctc.sample_id, 1)
@@ -400,6 +423,8 @@ for ctc in tqdm(cell_Ptrans_configs):
     
     # Don't apply filter regex, but take all cells from lm_data 
     # Try and except for cases when time was added to lm_data before (by partially running the notebook)
+
+    # USE LM DATA SINCE IT DOESNT HAVE BEHAVIOR COLUMNS (makes filtering easier)
     cell_subset_df = lm_data.get(ctc.sample_id)#Get subset of cells
     try:
         cell_subset_df.set_index(sample_df.time, inplace=True) #Set time to index (essential for min/max...)
@@ -721,7 +746,7 @@ right_half_window_size = 200.0
 # trans_df defined in pargraph before 
 windows = []
 n_behavior = 0
-
+# TODO: Split filter columns and  extract windows
 for ctc in tqdm(cell_Ttrans_configs):
     sample_df = sample_data.get(ctc.sample_id)
     if sample_df is None:
@@ -897,7 +922,7 @@ right_half_window_size = 50.0
 # trans_df defined in pargraph before 
 windows = []
 n_behavior = 0
-
+# TODO: split  window and filter
 for ctc in tqdm(cell_Strans_configs):
     sample_df = sample_data.get(ctc.sample_id)
     if sample_df is None:

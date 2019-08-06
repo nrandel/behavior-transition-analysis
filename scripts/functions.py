@@ -52,6 +52,7 @@ TIMELAPSE_DIRECTORY = r"/Users/randeln/Documents/Zlatic_lab/close-loop/Notes/tim
 USE_TIME_CACHE = True
 TIMELAPSE_CACHE_FILE = "timelapse.cache"
 
+
 def get_sample_data():
     logging.warning(
         "Chris's FRAN is zero based!!, whereas old annotations are 1 based. NOT YET HANDLED PROPERLY?"
@@ -59,28 +60,28 @@ def get_sample_data():
 
     behavior_files = []
     for d in BEHAVIOR_DIRECTORIES:
-        behavior_files.extend(
-            glob.glob(os.path.join(d, "*.csv"))
-        )
+        behavior_files.extend(glob.glob(os.path.join(d, "*.csv")))
 
     lightmicroscope_files = []
     for d in LIGHTMICROSOPE_DIRECTORIES:
-        lightmicroscope_files.extend(
-            glob.glob(os.path.join(d, "*.csv"))
-        )
+        lightmicroscope_files.extend(glob.glob(os.path.join(d, "*.csv")))
 
-    timelapse_files = glob.glob(
-        os.path.join(TIMELAPSE_DIRECTORY, "*.txt")
-    )
-
+    timelapse_files = glob.glob(os.path.join(TIMELAPSE_DIRECTORY, "*.txt"))
 
     behavior_data = readall_behavior(behavior_files)
     lm_data = readall_lm(lightmicroscope_files)
-    time_data = readall_time(timelapse_files, timelapse_cache=TIMELAPSE_CACHE_FILE, use_time_cache=USE_TIME_CACHE)
+    time_data = readall_time(
+        timelapse_files,
+        timelapse_cache=TIMELAPSE_CACHE_FILE,
+        use_time_cache=USE_TIME_CACHE,
+    )
 
     sample_data = lm_data
     combine_lm_time_data(
-        sample_data, time_data, ERROR_ON_MISSING_TIMESTAMPS, ERROR_ON_TIME_LIGHT_MISMATCH
+        sample_data,
+        time_data,
+        ERROR_ON_MISSING_TIMESTAMPS,
+        ERROR_ON_TIME_LIGHT_MISMATCH,
     )
 
     combine_lm_behavior_data(
@@ -93,6 +94,7 @@ def get_sample_data():
     )
 
     return sample_data
+
 
 def combine_lm_behavior_data(
     lm_data,
@@ -141,7 +143,11 @@ def combine_lm_behavior_data(
             end = int(row["END"])
 
             if type(row["START"]) == str:
-                logging.debug("sample_id: {}, starts at {}, ends at {}".format(sample_id, start, end))
+                logging.debug(
+                    "sample_id: {}, starts at {}, ends at {}".format(
+                        sample_id, start, end
+                    )
+                )
 
             if start >= end:
                 msg = "{}: start ({}) needs to be strictly smaller than end ({})".format(
@@ -224,11 +230,19 @@ def combine_lm_behavior_data(
                 i == last_sample_idx or not lm_df.at[i + 1, "quiet"]
             )
 
+
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
-def combine_lm_time_data(lm_data, time_data, error_on_missing_timestamps=True, error_on_time_light_mismatch=True, show_diffs=False):
+
+def combine_lm_time_data(
+    lm_data,
+    time_data,
+    error_on_missing_timestamps=True,
+    error_on_time_light_mismatch=True,
+    show_diffs=False,
+):
     # Time data are merged into light data and checked if number length of lm = timestamp.
     # Due to technical conditions, some time.txt-file have too many or not enough time data compared
     # to the corresponding LM data. The discrepancy is fixed by either dropping the extra timepoints or
@@ -307,10 +321,10 @@ def combine_lm_time_data(lm_data, time_data, error_on_missing_timestamps=True, e
 
         plt.hist(all_diffs, bins=10, alpha=0.5)
         plt.show()
-    
+
     logging.info(
         "Matched {} light data sets with their respective time points".format(
             len(lm_data)
         )
     )
-        
+
