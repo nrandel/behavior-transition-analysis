@@ -328,3 +328,10 @@ def combine_lm_time_data(
         )
     )
 
+
+def merge_dataframe_list(list_of_dfs):
+
+    combined_df = list_of_dfs.pop(0)
+    for right_df in list_of_dfs:
+        combined_df = pd.merge_ordered(combined_df, right_df, on="time", how="outer")
+    return combined_df

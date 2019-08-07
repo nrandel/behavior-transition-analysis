@@ -1,6 +1,7 @@
 # Put '' [empty string] if you dont want any cell type
 from tqdm import tqdm
 from functions import AVAILABLE_BEHAVIORS
+import logging
 
 
 class CellTransConfig:
@@ -41,9 +42,10 @@ def extract_windows(
     cell_transition_configs,
     left_half_window_size=18.4,
     right_half_window_size=42.4,
+    cell_pattern_filter = True,
 ):
     # trans_df defined in pargraph before
-    windows = []
+    all_Ptrans_events = []
     n_behavior_per_sample = {}
 
     # TODO: Split filter data and extract windows
@@ -55,16 +57,20 @@ def extract_windows(
             raise ValueError("{}: could not find sample data".format(ctc.sample_id))
             continue
 
-        # Extract columns matching our cell type and the optional filter pattern.
         # TODO make regex optional and filter out behavior
+
+        # TODO: make extracting behavior / cell columns easy and accessable anywhere
         all_columns = set(sample_df.columns)
         behavior_columns = set(
             column
             for column in all_columns
-            if any(behavior in column for behavior in AVAILABLE_BEHAVIORS + "quiet")
+            if any(behavior in column for behavior in AVAILABLE_BEHAVIORS + ("quiet",))
         )
         cell_df = sample_df.filter(items=all_columns - behavior_columns)
-        cell_subset_df = cell_df.filter(regex=ctc.get_filter_regex())
+        if cell_pattern_filter:
+            cell_subset_df = cell_df.filter(regex=ctc.get_filter_regex())
+        else:
+            cell_subset_df = cell_df
         cell_subset_df.set_index(sample_df.time, inplace=True)
         cell_subset_df.reset_index(inplace=True)
 
@@ -98,3 +104,4 @@ def extract_windows(
         # Rename time collum to time
         trans.rename(columns={trans.columns[0]: "time"}, inplace=True)
         all_Ptrans_events.append(trans)  # Append a list with all event
+    return all_Ptrans_events

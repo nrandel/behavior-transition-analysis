@@ -2,24 +2,54 @@
 # Imports and Load data
 
 import logging
-from functions import get_sample_data
-from classes import CellTraceConfig
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib import ticker
-import tqdm
+from tqdm import tqdm
 
-from logging_functions import count_cell_filterpatterns
-from plotting_functions import plot_all_events
-from classes.cell_trace_config import extract_windows, cell_trace_config_filter
-from plotting_functions import plot_windowed_events
+from logging_functions import log_num_transitions
+from logging_functions import log_unique_column_values
+from plotting_functions import plot_transition_gaps_hist
+from plotting_functions import plot_transitions
+from transition_functions import find_behavior_before
+from transition_functions import extract_transitions
 
+from classes.transition_type import TransitionType
+from classes.cell_transition_config import CellTransConfig, extract_windows
 from classes import PostBehaviorTransition
 
-from transition_functions import find_behavior_before
+from functions import merge_dataframe_list
+from functions import get_sample_data
 
 PLOT_EVERY_SAMPLE = True
+PLOT_TRANSITION_GAPS = False
+USE_CELL_PATTERN_FILTER = True
+
+
+BEHAVIOR_TRANSITIONS = [
+    PostBehaviorTransition("17-08-26L2-cl", "turn", "fw", 4.9),
+    PostBehaviorTransition("17-08-26L6-cl", "turn", "fw", 4.9),
+]
+
+"""
+# Open all samples multiple Transitions
+BEHAVIOR_TRANSITIONS = [
+    PostBehaviorTransition(name, 'fw', 'stim', 4.9) for name in sample_data] + [
+    PostBehaviorTransition(name, 'bw', 'stim', 4.9) for name in sample_data] + [
+    PostBehaviorTransition(name, 'turn', 'stim', 4.9) for name in sample_data] + [
+    PostBehaviorTransition(name, 'hunch', 'stim', 4.9) for name in sample_data] + [
+    PostBehaviorTransition(name, 'other', 'stim', 4.9) for name in sample_data]
+"""
+
+TRANSITION_TYPES = [
+    # TransitionType(first_event = 'fw'),
+    # TransitionType(first_event = 'bw'),
+    TransitionType(first_event="turn"),
+    # TransitionType(first_event = 'hunch'),
+    # TransitionType(first_event = 'other'),
+    # TransitionType(first_event="stim")
+]
 
 # Logging info:
 # Logging has 4 levels (DEBUG, INFO, WARNING, ERROR)
@@ -30,54 +60,19 @@ logging.basicConfig(level=logging.INFO, filename="log.log")
 sample_data = get_sample_data()
 
 # %%
-#########################################################################################################################
+#######################################################################################################################
 # transitions
-#########################################################################################################################
-# %%
-behavior_transitions = [
-    PostBehaviorTransition("17-08-26L2-cl", "turn", "fw", 4.9),
-    PostBehaviorTransition("17-08-26L6-cl", "turn", "fw", 4.9),
-]
+#######################################################################################################################
 
-# Open all samples single Transitions
-# behavior_transitions = [
-#    PostBehaviorTransition(name, 'stim', 'fw', 4.9) for name in sample_data]
 
-"""
-# Open all samples multiple Transitions
-behavior_transitions = [
-    PostBehaviorTransition(name, 'fw', 'stim', 4.9) for name in sample_data] + [
-    PostBehaviorTransition(name, 'bw', 'stim', 4.9) for name in sample_data] + [
-    PostBehaviorTransition(name, 'turn', 'stim', 4.9) for name in sample_data] + [
-    PostBehaviorTransition(name, 'hunch', 'stim', 4.9) for name in sample_data] + [
-    PostBehaviorTransition(name, 'other', 'stim', 4.9) for name in sample_data]
-"""
-
-from transition_functions import extract_transitions
-
-found_transitions = extract_transitions(sample_data, behavior_transitions)
-
-from logging_functions import log_num_transitions
+found_transitions = extract_transitions(sample_data, BEHAVIOR_TRANSITIONS)
 
 log_num_transitions(found_transitions)
 
-# print(found_transitions) # Transitions
-# %%
-# Duration between diff behavior from PostTransition (min, max, avg)
-# Note: only works for one type of transitions
-from plotting_functions import plot_transition_gaps_hist
 
-plot_transition_gaps_hist(found_transitions)
+if PLOT_TRANSITION_GAPS:
+    plot_transition_gaps_hist(found_transitions)
 
-
-raise Exception("STOP HERE!")
-
-# %%
-# Define celltype, filter-pattern for transitions. Optional do not run regex-filter. Aligning to first event start or
-# second event start: depends on stimulus. Output: a) aligned raw values, b) aloigned interpolated values.
-# tqdm = progress bar
-
-from classes import CellTransConfig
 
 cell_Ptrans_configs = []
 all_Ptrans_events = []
@@ -104,212 +99,50 @@ for sample in tqdm(found_transitions):
         #                                           first_event=found_transition["first_event"],
         #                                           second_event=found_transition["second_event"]))
 
-# Extract for specific time window and align several events.
-# Define timepoints pre and post an event (event_df).
-# This works for single sample or multiple samples aligned
-# Note: In cell_subset_df, time was set to index, because for the previous avg calculation
-# Add index and time = column
+all_Ptrans_events = extract_windows(
+    sample_data, cell_Ptrans_configs, cell_pattern_filter=USE_CELL_PATTERN_FILTER
+)
 
-# Set the window range left and right from the event (in seconds)
-left_half_window_size = (
-    18.5
-)  # If negative it goes further to right half (Good for skipping stimulus)
-right_half_window_size = 42.4
-
-# trans_df defined in pargraph before
-windows = []
-n_behavior_per_sample = {}
-
-# TODO: Split filter data and extract windows
-for ctc in tqdm(cell_Ptrans_configs):
-    sample_df = sample_data.get(ctc.sample_id)
-    n_behavior = n_behavior_per_sample.get(ctc.sample_id, 1)
-    n_behavior_per_sample.setdefault(ctc.sample_id, 1)
-    if sample_df is None:
-        raise ValueError("{}: could not find sample data".format(ctc.sample_id))
-        continue
-
-    # Extract columns matching our cell type and the optional filter pattern.
-    # cell_subset_df = sample_df.filter(regex=ctc.get_filter_regex()) #Get subset of cells
-    # cell_subset_df.set_index(sample_df.time, inplace=True) #Set time to index (essential for min/max...)
-    # cell_subset_df.reset_index(inplace = True) # Add index and time = column
-
-    # Don't apply filter regex, but take all cells from lm_data
-    # Try and except for cases when time was added to lm_data before (by partially running the notebook)
-
-    # USE LM DATA SINCE IT DOESNT HAVE BEHAVIOR COLUMNS (makes filtering easier)
-    cell_subset_df = lm_data.get(ctc.sample_id)  # Get subset of cells
-    try:
-        cell_subset_df.set_index(
-            sample_df.time, inplace=True
-        )  # Set time to index (essential for min/max...)
-        cell_subset_df.reset_index(
-            inplace=True, drop=True
-        )  # Add index and time = column
-    except:
-        pass
-
-    n_behavior_per_sample[ctc.sample_id] += 1
-    window_start = ctc.event_time - left_half_window_size
-    window_end = ctc.event_time + right_half_window_size
-
-    # Get subset of rows between window_start and window_end
-    # Including event_start
-    # trans = cell_subset_df[(cell_subset_df.time >= window_start) & (cell_subset_df.time <= window_end)]
-    # Excluding event start
-    trans = cell_subset_df[
-        (cell_subset_df.time > window_start) & (cell_subset_df.time < window_end)
-    ]
-    # Normalizing the data to align on beginning of selected
-    # behavior (event_df = Zero) by substracting events in window
-    # around start of event of interest from start of event interest.
-    # Note: using ":" in event.loc[] will select "all rows" in our window.
-    # trans.loc[:, 'time'] = trans['time'] - row['time']
-    trans.loc[:, "time"] = trans["time"] - ctc.event_time
-
-    # Add sample_id to each column as prefix and n_behavior as suffix to distinguish events within a sample
-    trans.rename(
-        lambda x: "{}_{}_{}_{}_{}".format(
-            ctc.sample_id, x, n_behavior, ctc.first_event, ctc.second_event
-        ),
-        axis="columns",
-        inplace=True,
-    )
-
-    # Rename time collum to time
-    trans.rename(columns={trans.columns[0]: "time"}, inplace=True)
-    all_Ptrans_events.append(trans)  # Append a list with all event
-# print(all_Ptrans_events)
-
-# Removes first event and takes it as left_window in pd.merge_ordered and iterates than through all_events
-all_Ptrans_df = all_Ptrans_events.pop(0)
-for right_df in all_Ptrans_events:
-    all_Ptrans_df = pd.merge_ordered(all_Ptrans_df, right_df, on="time", how="outer")
-# print(all_Ptrans_df)
+all_Ptrans_df = merge_dataframe_list(all_Ptrans_events)
 
 # Resets the index as time and drops time column
 all_Ptrans_df.index = all_Ptrans_df["time"]
 del all_Ptrans_df["time"]
-# print(all_Ptrans_df)
 
-# Index intepolation (linear interpolatione not on all_df, because index [=time] is not eaqually distributed)
+
 int_all_Ptrans_df = all_Ptrans_df.interpolate(
     method="index", axis=0, limit=None, inplace=False, limit_direction="both"
 )
-print(int_all_Ptrans_df.columns)
 
-# %%
-# Figure out how many cells of a determine type and filter pattern are involved in a specific transition
-def extract_parts(column: str, indicies):
-    parts = column.split("_")
-    return tuple(parts[i] for i in indicies)
+log_unique_column_values(
+    int_all_Ptrans_df, cell=True, filter_pattern=True, sample_id=True
+)
 
 
-# indicies: 0: sample_id, 1: cell, 2: filter_pattern, 3: n_obs, 4: first_event, 5:second_event
-parts = [extract_parts(column, [0, 1, 2]) for column in int_all_Ptrans_df.columns]
-print(len(parts))
-print(len(set(parts)))
-# print(set(parts))
-# %%
-# For multiple transition events, group after transition (first, or second event) <most useful> with option to group
-# after celltype, filterpattern, sample_id, observations, using class TransitionType
+plot_transitions(all_Ptrans_df, TRANSITION_TYPES, use_sem=False)
+plot_transitions(all_Ptrans_df, TRANSITION_TYPES, use_sem=True)
 
-transition_types = [
-    # TransitionType(first_event = 'fw'),
-    # TransitionType(first_event = 'bw'),
-    # TransitionType(first_event = 'turn'),
-    # TransitionType(first_event = 'hunch'),
-    # TransitionType(first_event = 'other'),
-    TransitionType(first_event="stim")
-]
+plot_transitions(int_all_Ptrans_df, TRANSITION_TYPES, use_sem=False)
+plot_transitions(int_all_Ptrans_df, TRANSITION_TYPES, use_sem=True)
 
-print(transition_types)
-# %%
-
-# For multiple transition types!!
-# If a dataframe with NANs is plotted (raw-data = non interpolated), use
-# marker = '+', or 'o', since the line in the lineplot only connects
-# consecutive data points
-def aligned_layout_plot(
-    plot, tick_spacing=5, fov=(-18.5, 42.4, 0.0, 1.0), legend=False
-):
-    # Set fine x-axis scale
-    plot.xaxis.set_major_locator(ticker.MultipleLocator(tick_spacing))
-
-    # Set x and y limits and legend (default = False)
-    plot.axis(fov)
-    plot.legend().set_visible(legend)
-
-
-colors = ["cyan", "red", "violet", "red", "blue"]
-# colors = {tt.get_filter_regex(use_cell=True, use_filter_pattern=True, use_first_event=True, use_second_event=True) : color for tt, color in zip(transition_types, colors)}
-
-print(colors)
-
-fig = plt.figure()
-sub2 = fig.add_subplot(111)
-for tt, color in zip(transition_types, colors):
-    int_some_Ptrans_df = int_all_Ptrans_df.filter(
-        regex=tt.get_filter_regex(
-            use_cell=True,
-            use_filter_pattern=True,
-            use_first_event=True,
-            use_second_event=True,
-        )
-    )
-
-    # Average and stddev, min, max, sem for post_behavior_transition events
-    all_Ptrans_avg_df = int_some_Ptrans_df.mean(axis=1)  # Interpolated data used
-    all_Ptrans_min_df = int_some_Ptrans_df.min(axis=1)
-    all_Ptrans_max_df = int_some_Ptrans_df.max(axis=1)
-    # Standard deviation (distribution)
-    all_Ptrans_std_df = int_some_Ptrans_df.std(axis=1)
-    # standard error of mean
-    all_Ptrans_sem_df = int_some_Ptrans_df.sem(axis=1)
-
-    all_Ptrans_avg_df.plot(
-        ax=sub2, label=tt.get_filter_regex(use_all=True), color=color
-    )  # use interpolated df to calculate average...
-    # all_Ptrans_avg_df.plot(yerr=all_Ptrans_std_df, ax=sub2, label = tt.get_filter_regex(use_all=True), alpha = 0.005, color = color)
-    all_Ptrans_avg_df.plot.line(
-        yerr=all_Ptrans_sem_df, ax=sub2, color="grey", alpha=0.5
-    )
-aligned_layout_plot(sub2, legend=True)
-
-# %%
-# To make the plot in the notebook and not in an extra window
-
-# Only for one type of transitions (I still need this!!)
-
-# Average and stddev, min, max, sem for post_behavior_transition events
-all_Ptrans_avg_df = int_all_Ptrans_df.mean(axis=1)  # Interpolated data used
+"""
+all_Ptrans_avg_df = int_all_Ptrans_df.mean(axis=1)
 all_Ptrans_min_df = int_all_Ptrans_df.min(axis=1)
 all_Ptrans_max_df = int_all_Ptrans_df.max(axis=1)
-# Standard deviation (distribution)
 all_Ptrans_std_df = int_all_Ptrans_df.std(axis=1)
-# standard error of mean
 all_Ptrans_sem_df = int_all_Ptrans_df.sem(axis=1)
 # wrong zur haelfte: Want to have avg per celltyp over time point,
 # and not avg over all cells per timepoint (refer to Data_filter or Grouper)
 
-# Plotting for multi-events (same_behavioral_transition)
-# If a dataframe with NANs is plotted (raw-data = non interpolated), use
-# marker = '+', or 'o', since the line in the lineplot only connects
-# consecutive data points
 def aligned_layout_plot(
     plot, tick_spacing=5, fov=(-18.5, 42.4, 0.0, 1.0), legend=False
 ):
-    # Set fine x-axis scale
     plot.xaxis.set_major_locator(ticker.MultipleLocator(tick_spacing))
-
-    # Set x and y limits and legend (default = False)
     plot.axis(fov)
     plot.legend().set_visible(legend)
 
-
 fig = plt.figure()
 
-# Plot all cells from all_df, aligned at zero for event_start, specified in Cell_Trace_Config.
 sub1 = fig.add_subplot(111)  # 211
 all_Ptrans_df.plot(ax=sub1, marker="*", label=ctc.cell_type)
 aligned_layout_plot(sub1)
@@ -321,6 +154,10 @@ aligned_layout_plot(sub1)
 # all_Ptrans_avg_df.plot.line(yerr=all_Ptrans_std_df, ax=sub2, color = 'lightgrey', alpha = 0.1)
 # all_Ptrans_avg_df.plot.line(yerr=all_Ptrans_sem_df, ax=sub2, color = 'grey', alpha = 0.1)
 # aligned_layout_plot(sub2)
+"""
+
+
+raise Exception("STOP HERE!")
 # %%
 # all all_Ptrans_df with left and right window in same data frame and aligned to second_event_start
 # (for stim first event on first_event_start_)
@@ -644,7 +481,7 @@ aligned_layout_plot(sub2)
 
 
 # Open all samples
-behavior_transitions = [
+BEHAVIOR_TRANSITIONS = [
     SamePairBehaviorTransition(
         name, "turn", "turn", max_delay=10, max_ignored_quiet_time=math.inf
     )
@@ -653,7 +490,7 @@ behavior_transitions = [
 
 
 found_transitions = []
-for bt in tqdm(behavior_transitions):
+for bt in tqdm(BEHAVIOR_TRANSITIONS):
     sample_df = sample_data.get(bt.sample_id)
 
     if not any(["bw" in column for column in sample_df.columns]):

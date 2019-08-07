@@ -44,7 +44,40 @@ def log_overlapping_transition(transition, seconds_overlap=0):
                 transition["sample_id"],
                 transition["first_event_end"],
                 transition["second_event_start"],
-                transition["first_event_end"] - transition["second_event_start"]
+                transition["first_event_end"] - transition["second_event_start"],
             )
         )
 
+
+def log_unique_column_values(
+    df,
+    sample_id=False,
+    cell=False,
+    filter_pattern=False,
+    n_obs=False,
+    first_event=False,
+    second_event=False,
+):
+    values = (sample_id, cell, filter_pattern, n_obs, first_event, second_event)
+    string_values = (
+        "sample_id",
+        "cell",
+        "filter_pattern",
+        "n_obs",
+        "first_event",
+        "second_event",
+    )
+    indicies = tuple(i for i in range(len(values)) if values[i])
+
+    def extract_parts(column: str, indicies):
+        parts = column.split("_")
+        return tuple(parts[i] for i in indicies)
+
+    parts = set([extract_parts(column, indicies) for column in df.columns])
+    logging.info(
+        "Counted {} unique columns for {}".format(
+            len(parts),
+            tuple(string_values[i] for i in indicies)
+        )
+    )
+    logging.info("parts: {}".format(parts))

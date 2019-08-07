@@ -89,11 +89,11 @@ def plot_all_events(sample_data, cell_trace_configs):
         )
 
 
+from functions import merge_dataframe_list
+
+
 def plot_windowed_events(all_events):
-    all_df = all_events.pop(0)
-    for right_df in all_events:
-        print(right_df.columns)
-        all_df = pd.merge_ordered(all_df, right_df, on="time", how="outer")
+    all_df = merge_dataframe_list(all_events)
 
     # Resets the index as time and drops time column (sollte spaeter kommen)
     all_df.index = all_df["time"]
@@ -167,4 +167,40 @@ def plot_transition_gaps_hist(found_transitions):
     # Histogram
     fig = plt.figure()
     plt.hist(gap_Ptrans, bins=100, alpha=0.5)
+    plt.show()
+
+
+def plot_transitions(df, transition_types, use_sem=False):
+    colors = ["cyan", "red", "violet", "red", "blue"]
+
+    fig = plt.figure()
+    sub2 = fig.add_subplot(111)
+    for tt, color in zip(transition_types, colors):
+        tt_df = df.filter(
+            regex=tt.get_filter_regex(
+                use_cell=True,
+                use_filter_pattern=True,
+                use_first_event=True,
+                use_second_event=True,
+            )
+        )
+
+        tt_avg_df = tt_df.mean(axis=1)
+        tt_min_df = tt_df.min(axis=1)
+        tt_max_df = tt_df.max(axis=1)
+        tt_std_df = tt_df.std(axis=1)
+        tt_sem_df = tt_df.sem(axis=1)
+
+        tt_avg_df.plot(ax=sub2, label=tt.get_filter_regex(use_all=True), color=color)
+        if use_sem:
+            tt_avg_df.plot(yerr=tt_sem_df, ax=sub2, color="grey", alpha=0.5)
+        else:
+            tt_avg_df.plot(
+                yerr=tt_std_df,
+                ax=sub2,
+                # label=tt.get_filter_regex(use_all=True),
+                alpha=0.5,
+                color="grey",
+            )
+    aligned_layout_plot(sub2, tick_spacing=5, fov=(-18.5, 42.4, 0.0, 1.0), legend=True)
     plt.show()
