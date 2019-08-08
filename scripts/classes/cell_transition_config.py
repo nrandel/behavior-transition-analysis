@@ -49,7 +49,7 @@ def extract_windows(
     n_behavior_per_sample = {}
 
     # TODO: Split filter data and extract windows
-    for ctc in tqdm(cell_transition_configs):
+    for ctc in tqdm(cell_transition_configs, "Extracting windows"):
         sample_df = sample_data.get(ctc.sample_id)
         n_behavior = n_behavior_per_sample.get(ctc.sample_id, 1)
         n_behavior_per_sample.setdefault(ctc.sample_id, 1)

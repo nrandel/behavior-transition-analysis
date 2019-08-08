@@ -1,6 +1,7 @@
 from classes.cell_trace_config import CellTraceConfig, cell_trace_config_filter
 import logging
 import numpy as np
+from scipy.stats import mannwhitneyu
 
 
 def count_cell_filterpatterns(sample_data, cell, filter_pattern):
@@ -76,8 +77,22 @@ def log_unique_column_values(
     parts = set([extract_parts(column, indicies) for column in df.columns])
     logging.info(
         "Counted {} unique columns for {}".format(
-            len(parts),
-            tuple(string_values[i] for i in indicies)
+            len(parts), tuple(string_values[i] for i in indicies)
         )
     )
     logging.info("parts: {}".format(parts))
+
+
+def log_mann_whitney_u_test(transition_dfs, transitions, comparisons):
+    transition_df_map = {t: t_df for t, t_df in zip(transitions, transition_dfs)}
+    mwu_results = [
+        mannwhitneyu(transition_df_map[a], transition_df_map[b]) for a, b in comparisons
+    ]
+    info = "\n".join(
+        [
+            "Mann-Whitney u test comparing {} to {}: {}".format(a, b, result)
+            for (a, b), result in zip(comparisons, mwu_results)
+        ]
+    )
+
+    logging.info(info)

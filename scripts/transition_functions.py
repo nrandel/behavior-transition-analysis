@@ -279,7 +279,7 @@ def get_unrelated_nonquiet_behaviors(excluding=[]):
 
 def extract_transitions(sample_data, behavior_transitions):
     found_transitions = []
-    for bt in tqdm(behavior_transitions):
+    for bt in tqdm(behavior_transitions, "Extracting Transitions: "):
         sample_df = sample_data.get(bt.sample_id)
         # skip samples without behavior data
         if not any(["bw" in column for column in sample_df.columns]):

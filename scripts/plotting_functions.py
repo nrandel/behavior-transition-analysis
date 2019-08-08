@@ -3,7 +3,8 @@ from classes.cell_trace_config import cell_trace_config_filter, get_event_start_
 import logging
 import matplotlib.pyplot as plt
 from matplotlib import ticker
-import pandas as pd
+
+from functions import merge_dataframe_list
 
 
 # Plotting - single sample for whole time
@@ -89,11 +90,8 @@ def plot_all_events(sample_data, cell_trace_configs):
         )
 
 
-from functions import merge_dataframe_list
-
-
 def plot_windowed_events(all_events):
-    all_df = merge_dataframe_list(all_events)
+    all_df = merge_dataframe_list(all_events, on="time", how="outer")
 
     # Resets the index as time and drops time column (sollte spaeter kommen)
     all_df.index = all_df["time"]
@@ -203,4 +201,17 @@ def plot_transitions(df, transition_types, use_sem=False):
                 color="grey",
             )
     aligned_layout_plot(sub2, tick_spacing=5, fov=(-18.5, 42.4, 0.0, 1.0), legend=True)
+    plt.show()
+
+
+def plot_fold_change(df, transitions):
+
+    # Plot fold change
+    ax = df.plot.box()  # its a series (diff for data frame)
+    ax.set_title("")
+    ax.set_xlabel("Transitions")
+    ax.set_ylabel("Fold change")
+    ax.set_xticklabels(transitions)
+
+    # ax = fold_change_df.plot.box() #single transition type
     plt.show()

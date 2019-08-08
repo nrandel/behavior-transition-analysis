@@ -10,46 +10,23 @@ from tqdm import tqdm
 
 from logging_functions import log_num_transitions
 from logging_functions import log_unique_column_values
+from logging_functions import log_mann_whitney_u_test
+
 from plotting_functions import plot_transition_gaps_hist
 from plotting_functions import plot_transitions
+from plotting_functions import plot_fold_change
+
 from transition_functions import find_behavior_before
 from transition_functions import extract_transitions
+
+from functions import merge_dataframe_list
+from functions import get_sample_data
+from functions import get_fold_change_df
+from functions import extract_transition_dfs
 
 from classes.transition_type import TransitionType
 from classes.cell_transition_config import CellTransConfig, extract_windows
 from classes import PostBehaviorTransition
-
-from functions import merge_dataframe_list
-from functions import get_sample_data
-
-PLOT_EVERY_SAMPLE = True
-PLOT_TRANSITION_GAPS = False
-USE_CELL_PATTERN_FILTER = True
-
-
-BEHAVIOR_TRANSITIONS = [
-    PostBehaviorTransition("17-08-26L2-cl", "turn", "fw", 4.9),
-    PostBehaviorTransition("17-08-26L6-cl", "turn", "fw", 4.9),
-]
-
-"""
-# Open all samples multiple Transitions
-BEHAVIOR_TRANSITIONS = [
-    PostBehaviorTransition(name, 'fw', 'stim', 4.9) for name in sample_data] + [
-    PostBehaviorTransition(name, 'bw', 'stim', 4.9) for name in sample_data] + [
-    PostBehaviorTransition(name, 'turn', 'stim', 4.9) for name in sample_data] + [
-    PostBehaviorTransition(name, 'hunch', 'stim', 4.9) for name in sample_data] + [
-    PostBehaviorTransition(name, 'other', 'stim', 4.9) for name in sample_data]
-"""
-
-TRANSITION_TYPES = [
-    # TransitionType(first_event = 'fw'),
-    # TransitionType(first_event = 'bw'),
-    TransitionType(first_event="turn"),
-    # TransitionType(first_event = 'hunch'),
-    # TransitionType(first_event = 'other'),
-    # TransitionType(first_event="stim")
-]
 
 # Logging info:
 # Logging has 4 levels (DEBUG, INFO, WARNING, ERROR)
@@ -58,6 +35,46 @@ logging.basicConfig(level=logging.INFO, filename="log.log")
 
 # TODO: Cleanup comments in get_sample_data
 sample_data = get_sample_data()
+
+PLOT_EVERY_SAMPLE = True
+PLOT_TRANSITION_GAPS = False
+USE_CELL_PATTERN_FILTER = True
+
+"""
+BEHAVIOR_TRANSITIONS = [
+    PostBehaviorTransition("17-08-26L2-cl", "turn", "fw", 4.9),
+    PostBehaviorTransition("17-08-26L6-cl", "turn", "fw", 4.9),
+]
+
+"""
+# Open all samples multiple Transitions
+BEHAVIOR_TRANSITIONS = (
+    [PostBehaviorTransition(name, "fw", "stim", 4.9) for name in sample_data]
+    + [PostBehaviorTransition(name, "bw", "stim", 4.9) for name in sample_data]
+    + [PostBehaviorTransition(name, "turn", "stim", 4.9) for name in sample_data]
+    + [PostBehaviorTransition(name, "hunch", "stim", 4.9) for name in sample_data]
+    + [PostBehaviorTransition(name, "other", "stim", 4.9) for name in sample_data]
+)
+
+
+TRANSITION_TYPES = [
+    TransitionType(first_event="fw"),
+    TransitionType(first_event="bw"),
+    TransitionType(first_event="turn"),
+    TransitionType(first_event="hunch"),
+    TransitionType(first_event="other"),
+    TransitionType(first_event="stim"),
+]
+
+MANN_WHITNEY_U_TEST_COMPARISONS = (
+    ("fw_stim", "bw_stim"),
+    ("fw_stim", "turn_stim"),
+    ("fw_stim", "hunch_stim"),
+    ("fw_stim", "other_stim"),
+    ("bw_stim", "turn_stim"),
+    ("bw_stim", "bw_stim"),
+)
+
 
 # %%
 #######################################################################################################################
@@ -103,7 +120,7 @@ all_Ptrans_events = extract_windows(
     sample_data, cell_Ptrans_configs, cell_pattern_filter=USE_CELL_PATTERN_FILTER
 )
 
-all_Ptrans_df = merge_dataframe_list(all_Ptrans_events)
+all_Ptrans_df = merge_dataframe_list(all_Ptrans_events, on="time", how="outer")
 
 # Resets the index as time and drops time column
 all_Ptrans_df.index = all_Ptrans_df["time"]
@@ -125,132 +142,27 @@ plot_transitions(all_Ptrans_df, TRANSITION_TYPES, use_sem=True)
 plot_transitions(int_all_Ptrans_df, TRANSITION_TYPES, use_sem=False)
 plot_transitions(int_all_Ptrans_df, TRANSITION_TYPES, use_sem=True)
 
-"""
-all_Ptrans_avg_df = int_all_Ptrans_df.mean(axis=1)
-all_Ptrans_min_df = int_all_Ptrans_df.min(axis=1)
-all_Ptrans_max_df = int_all_Ptrans_df.max(axis=1)
-all_Ptrans_std_df = int_all_Ptrans_df.std(axis=1)
-all_Ptrans_sem_df = int_all_Ptrans_df.sem(axis=1)
-# wrong zur haelfte: Want to have avg per celltyp over time point,
-# and not avg over all cells per timepoint (refer to Data_filter or Grouper)
+fold_change_df = get_fold_change_df(df=all_Ptrans_df, pre=0, post=2)
+transitions, transition_dfs = extract_transition_dfs(fold_change_df)
+all_fold_change_df = merge_dataframe_list(transition_dfs, ordered=False, left_index=True, right_index=True, how="outer")
+plot_fold_change(df=all_fold_change_df, transitions=transitions)
 
-def aligned_layout_plot(
-    plot, tick_spacing=5, fov=(-18.5, 42.4, 0.0, 1.0), legend=False
-):
-    plot.xaxis.set_major_locator(ticker.MultipleLocator(tick_spacing))
-    plot.axis(fov)
-    plot.legend().set_visible(legend)
+int_fold_change_df = get_fold_change_df(df=int_all_Ptrans_df, pre=0, post=2)
+int_transitions, int_transition_dfs = extract_transition_dfs(int_fold_change_df)
+int_all_fold_change_df = merge_dataframe_list(int_transition_dfs, ordered=False, left_index=True, right_index=True, how="outer")
+plot_fold_change(df=int_all_fold_change_df, transitions=int_transitions)
 
-fig = plt.figure()
-
-sub1 = fig.add_subplot(111)  # 211
-all_Ptrans_df.plot(ax=sub1, marker="*", label=ctc.cell_type)
-aligned_layout_plot(sub1)
-
-# sub2 = fig.add_subplot(212) #212
-# all_Ptrans_avg_df.plot(ax=sub2, color = 'c', label = ctc.cell_type) #use interpolated df to calculate average...
-# all_Ptrans_min_df.plot(ax=sub2, color = 'r', linewidth=1, alpha = 0.5)
-# all_Ptrans_max_df.plot(ax=sub2, color = 'r', linewidth=1, alpha = 0.5)
-# all_Ptrans_avg_df.plot.line(yerr=all_Ptrans_std_df, ax=sub2, color = 'lightgrey', alpha = 0.1)
-# all_Ptrans_avg_df.plot.line(yerr=all_Ptrans_sem_df, ax=sub2, color = 'grey', alpha = 0.1)
-# aligned_layout_plot(sub2)
-"""
-
-
-raise Exception("STOP HERE!")
-# %%
-# all all_Ptrans_df with left and right window in same data frame and aligned to second_event_start
-# (for stim first event on first_event_start_)
-# Average over the frames within the same sample (eg average over 1 sec)
-# extract all negative values for pre_event
-# extract positiv values for post event, but in case of the stimulus, the first two seconds must not be included
-
-
-pre_data = all_Ptrans_df[all_Ptrans_df.index < 0.0]
-post_data = all_Ptrans_df[
-    all_Ptrans_df.index > 2.0
-]  # for stim-behavior >2, otherwise >=0
-
-int_pre_data = pre_data.interpolate(
-    method="index", axis=0, limit=None, inplace=False, limit_direction="both"
-)
-int_post_data = post_data.interpolate(
-    method="index", axis=0, limit=None, inplace=False, limit_direction="both"
-)
-
-# Average over time for each cell type
-pre_data_avg = pre_data.mean(axis=0)
-post_data_avg = post_data.mean(axis=0)
-# %%
-# Fold change (bar plot) in cell activity post - pre/pre (merged orderd,No interpolation, NO avg)
-# Fold change for all cells individually
-
-# fold changeI: post/pre
-# fold_change = (post_data_avg)/(pre_data_avg)
-
-# fold changeII: post-pre/pre
-fold_change = ((post_data_avg) - (pre_data_avg)) / (pre_data_avg)
-# print(fold_change.index)
-
-# Transform Series to dataframe and name columns
-fold_change_df = fold_change.to_frame("transitions")
-# print(fold_change_df.index)
-# transitions = set(["_".join(sample_transition.split("_")[-2:]) for sample_transition in fold_change_df.index])
-
-transitions = []
-past = None
-for sample_transition in fold_change_df.index:
-    current = "_".join(sample_transition.split("_")[-2:])
-    if current != past:
-        transitions.append(current)
-        past = current
-print(transitions)
-
-print(transitions)
-transition_df_map = {
-    transition: fold_change_df[fold_change_df.index.str.contains(transition)]
-    for transition in transitions
-}
-print(list(transition_df_map.keys()))
-# print(transition_df_map["fw_stim"].head(10))
-# %%
-# Merge
-# df_key = name, df-list = dataframe
-transition_df_list = list(transition_df_map.items())
-df_key, all_fold_change_df = transition_df_list.pop(0)
-for df_key, right_df in transition_df_list:
-    all_fold_change_df = pd.merge(
-        all_fold_change_df, right_df, left_index=True, right_index=True, how="outer"
-    )
-
-# print(all_fold_change_df.to_string()) #print everything
-
-# Plot fold change
-ax = all_fold_change_df.plot.box()  # its a series (diff for data frame)
-ax.set_title("")
-ax.set_xlabel("Transitions")
-ax.set_ylabel("Fold change")
-ax.set_xticklabels(list(transition_df_map.keys()))
-
-# ax = fold_change_df.plot.box() #single transition type
-plt.show()
 # %%
 # Mann-Witney U test (non-parametric pair wise test)
 
 # da ist ne Menge significant:()
 
-from scipy.stats import stats
-from scipy.stats import mannwhitneyu
+log_mann_whitney_u_test(transition_dfs, transitions, MANN_WHITNEY_U_TEST_COMPARISONS)
+log_mann_whitney_u_test(
+    int_transition_dfs, int_transitions, MANN_WHITNEY_U_TEST_COMPARISONS
+)
 
-# mwu1 = mannwhitneyu(transition_df_map["fw_stim"], transition_df_map["bw_stim"])
-# mwu2 = mannwhitneyu(transition_df_map["fw_stim"], transition_df_map["turn_stim"])
-# mwu3 = mannwhitneyu(transition_df_map["fw_stim"], transition_df_map["hunch_stim"])
-# mwu4 = mannwhitneyu(transition_df_map["fw_stim"], transition_df_map["other_stim"])
-# mwu5 = mannwhitneyu(transition_df_map["bw_stim"], transition_df_map["turn_stim"])
-# mwu6 = mannwhitneyu(transition_df_map["bw_stim"], transition_df_map["bw_stim"])
-
-# print(mwu1, mwu2, mwu3, mwu4, mwu5, mwu6)
-# print(mwu1)
+raise Exception("STOP HERE!")
 # %%
 # Triple transition
 # Find first and  second transition between two different! behaviors with intersection:

@@ -329,9 +329,48 @@ def combine_lm_time_data(
     )
 
 
-def merge_dataframe_list(list_of_dfs):
-
-    combined_df = list_of_dfs.pop(0)
-    for right_df in list_of_dfs:
-        combined_df = pd.merge_ordered(combined_df, right_df, on="time", how="outer")
+def merge_dataframe_list(list_of_dfs, ordered=True, **kwargs):
+    combined_df = list_of_dfs[0]
+    for right_df in list_of_dfs[1:]:
+        if ordered:
+            combined_df = pd.merge_ordered(combined_df, right_df, **kwargs)
+        else:
+            combined_df = pd.merge(combined_df, right_df, **kwargs)
     return combined_df
+
+
+def split_window(df, pre=0, post=0):
+    pre_data = df[df.index < 0.0]
+    post_data = df[df.index > 2.0]
+    return pre_data, post_data
+
+
+def get_fold_change_df(df, pre=0, post=0):
+    pre_data, post_data = split_window(df=df, pre=pre, post=post)
+
+    pre_data_avg = pre_data.mean(axis=0)
+    post_data_avg = post_data.mean(axis=0)
+
+    # fold changeI: post/pre
+    # fold_change = (post_data_avg)/(pre_data_avg)
+
+    # fold changeII: post-pre/pre
+    fold_change = ((post_data_avg) - (pre_data_avg)) / (pre_data_avg)
+
+    fold_change_df = fold_change.to_frame("transitions")
+    return fold_change_df
+
+
+def extract_transition_dfs(df):
+
+    transitions = set()
+    for sample_transition in df.index:
+        current = "_".join(sample_transition.split("_")[-2:])
+        transitions.add(current)
+    transitions = list(transitions)
+
+    logging.info("Found transitions: {}".format(transitions))
+
+    transition_df_list = [df[df.index.str.contains(t)] for t in transitions]
+
+    return transitions, transition_df_list
