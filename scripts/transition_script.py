@@ -16,8 +16,8 @@ from plotting_functions import plot_transition_gaps_hist
 from plotting_functions import plot_transitions
 from plotting_functions import plot_fold_change
 
-from transition_functions import find_behavior_before
 from transition_functions import extract_transitions
+from transition_functions import extract_transition_triples
 
 from functions import merge_dataframe_list
 from functions import get_sample_data
@@ -56,6 +56,16 @@ BEHAVIOR_TRANSITIONS = (
     + [PostBehaviorTransition(name, "other", "stim", 4.9) for name in sample_data]
 )
 
+TRANSITION_TRIPLES = [
+    (
+        PostBehaviorTransition(sample_id, "bw", "stim", 3),
+        PostBehaviorTransition(sample_id, "stim", "quiet", 3),
+    )
+    for sample_id in sample_data
+]
+FIRST_TRANS_DURATION = None
+SECOND_TRANS_DURATION = None
+THIRD_TRANS_DURATION = 2
 
 TRANSITION_TYPES = [
     TransitionType(first_event="fw"),
@@ -144,12 +154,16 @@ plot_transitions(int_all_Ptrans_df, TRANSITION_TYPES, use_sem=True)
 
 fold_change_df = get_fold_change_df(df=all_Ptrans_df, pre=0, post=2)
 transitions, transition_dfs = extract_transition_dfs(fold_change_df)
-all_fold_change_df = merge_dataframe_list(transition_dfs, ordered=False, left_index=True, right_index=True, how="outer")
+all_fold_change_df = merge_dataframe_list(
+    transition_dfs, ordered=False, left_index=True, right_index=True, how="outer"
+)
 plot_fold_change(df=all_fold_change_df, transitions=transitions)
 
 int_fold_change_df = get_fold_change_df(df=int_all_Ptrans_df, pre=0, post=2)
 int_transitions, int_transition_dfs = extract_transition_dfs(int_fold_change_df)
-int_all_fold_change_df = merge_dataframe_list(int_transition_dfs, ordered=False, left_index=True, right_index=True, how="outer")
+int_all_fold_change_df = merge_dataframe_list(
+    int_transition_dfs, ordered=False, left_index=True, right_index=True, how="outer"
+)
 plot_fold_change(df=int_all_fold_change_df, transitions=int_transitions)
 
 # %%
@@ -179,76 +193,28 @@ second_transitions = [
 """
 # Open all samples
 
-first_transitions = [PostBehaviorTransition(name, "bw", "stim", 3) for name in lm_data]
+found_transition_triples = extract_transition_triples(
+    sample_data,
+    TRANSITION_TRIPLES,
+    first_trans_duration=FIRST_TRANS_DURATION,
+    second_trans_duration=SECOND_TRANS_DURATION,
+    third_trans_duration=THIRD_TRANS_DURATION,
+)
 
-second_transitions = [
-    PostBehaviorTransition(name, "stim", "quiet", 3) for name in lm_data
-]
+log_num_transitions(found_transition_triples)
 
-
-found_transitions = []
-for first_bt, second_bt in tqdm(zip(first_transitions, second_transitions)):
-    transitions = []
-    assert first_bt.sample_id == second_bt.sample_id, "{} does not match {}".format(
-        first_bt.sample_id, second_bt.sample_id
-    )
-    sample_df = sample_data.get(first_bt.sample_id)
-    if sample_df is None:
-        raise ValueError("No data found for sample {}".format(bt.sample_id))
-    if not any(["bw" in column for column in sample_df.columns]):
-        continue
-    first_transition_duration = None
-    second_transition_duration = None
-    third_transition_duration = 2
-    first_transitions = find_behavior_before(
-        first_bt.sample_id,
-        sample_df,
-        first_bt.event,
-        first_bt.post_event,
-        first_bt.max_delay,
-        first_event_duration=first_transition_duration,
-        second_event_duration=second_transition_duration,
-    )
-    second_transitions = find_behavior_before(
-        second_bt.sample_id,
-        sample_df,
-        second_bt.event,
-        second_bt.post_event,
-        second_bt.max_delay,
-        first_event_duration=second_transition_duration,
-        second_event_duration=third_transition_duration,
-    )
-    # print("{} transitions from {} to {}".format(len(first_transitions), first_bt.event, first_bt.post_event))
-    # print("{} transitions from {} to {}".format(len(second_transitions), second_bt.event, second_bt.post_event))
-
-    for ft in first_transitions:
-        for st in second_transitions:
-            if abs(ft["second_event_start"] - st["first_event_start"]) < 0.00001:
-                transitions.append(
-                    {
-                        "sample_id": ft["sample_id"],
-                        "first_event_start": ft["first_event_start"],
-                        "first_event_end": ft["first_event_end"],
-                        "second_event_start": st["first_event_start"],
-                        "second_event_end": st["first_event_end"],
-                        "third_event_start": st["second_event_start"],
-                    }
-                )
-    if transitions:
-        print("{} transition triples found".format(len(transitions)))
-        found_transitions.append(transitions)
-
-
-print(len(found_transitions))  # number of data sets not the actual stim
-print(sum([len(sample_transitions) for sample_transitions in found_transitions]))
-print(found_transitions)
+# TODO: Probably doesn't handle  triples properly
+plot_transition_gaps_hist(found_transition_triples)
 # %%
 # Use the predefined CellTransConfig to filter by celltype and pattern.
 # The results are merged_ordered and interpolated.
 cell_Ttrans_configs = []
 all_Ttrans_events = []
 
-for sample in tqdm(found_transitions):
+# TODO: MAKE NEW SCRIPT FOR TRANSITION TRIPLES
+# TODO: MAKE NEW CLASS FOR CellTriplesTransConfig
+# TODO: CHANGE COLUMN RENAMING IN extract_windows TO USE ALL 3 EVENTS
+for sample in tqdm(found_transition_triples):
     sample_ls_trans = []
     for found_transition in sample:
 
@@ -271,6 +237,14 @@ for sample in tqdm(found_transitions):
 # Set the window range left and right from the event (in seconds)
 left_half_window_size = 100.0
 right_half_window_size = 200.0
+
+all_Ttrans_windows = extract_windows(
+    sample_data,
+    cell_Ptrans_configs,
+    cell_pattern_filter=USE_CELL_PATTERN_FILTER,
+    left_half_window_size=left_half_window_size,
+    right_half_window_size=right_half_window_size,
+)
 
 # trans_df defined in pargraph before
 windows = []
@@ -401,7 +375,7 @@ BEHAVIOR_TRANSITIONS = [
 ]
 
 
-found_transitions = []
+found_same_transitions = []
 for bt in tqdm(BEHAVIOR_TRANSITIONS):
     sample_df = sample_data.get(bt.sample_id)
 
@@ -419,16 +393,16 @@ for bt in tqdm(BEHAVIOR_TRANSITIONS):
     )
 
     if transitions:
-        found_transitions.append(transitions)
+        found_same_transitions.append(transitions)
 
 # print(len(transitions))
-print(len(found_transitions))
-print(sum([len(sample_transitions) for sample_transitions in found_transitions]))
-# print(found_transitions)
+print(len(found_same_transitions))
+print(sum([len(sample_transitions) for sample_transitions in found_same_transitions]))
+# print(found_same_transitions)
 # %%
 # Duration between behavior from SameTransition (min, max, avg)
 gap_Strans = []
-for sample in tqdm(found_transitions):
+for sample in tqdm(found_same_transitions):
     for found_transition in sample:
         gap_Strans.append(
             (found_transition["second_event_start"])
@@ -465,7 +439,7 @@ plt.show()
 cell_Strans_configs = []
 all_Strans_events = []
 
-for sample in tqdm(found_transitions):
+for sample in tqdm(found_same_transitions):
     sample_ls_trans = []
     for found_transition in sample:
         # print(found_transition["sample_id"], found_transition["second_event_start"])
@@ -615,13 +589,16 @@ all_Strans_avg_df.plot.line(
 # all_Strans_avg_df.plot.line(yerr=all_Strans_sem_df, ax=sub2, color = 'grey', alpha = 0.1)
 aligned_layout_plot(sub2)
 # %%
+
+####################################################################################################
+# GROUPINGS
+####################################################################################################
 # Using class Transitiongrouper to group cell_type/pattern or both
 # This is crucial if statistical methods are applied for sub groups
 # Input dataframe from behavioral transitions (Post-, Same-, Triple-Transition)
 
 # grouper = TransitionGrouper(int_all_Ptrans_df)
 groupers = [TransitionGrouper(int_pre_data), TransitionGrouper(int_post_data)]
-
 
 # Function to calculate the average cell/pattern_groups depending on regex
 def average_grouping(grouping):

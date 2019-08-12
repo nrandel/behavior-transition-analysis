@@ -32,20 +32,20 @@ AVAILABLE_BEHAVIORS = (
 
 # Files
 BEHAVIOR_DIRECTORIES = [
-    r"/Users/randeln/Documents/Zlatic_lab/close-loop/Notes/behavior_csv_cl_A4/",
-    # r'/Users/randeln/Documents/Zlatic_lab/close-loop/Notes/behavior_csv_cl_A9/',
-    # r'/Users/randeln/Documents/Zlatic_lab/close-loop/Notes/behavior_csv_ol/',
-    # r'/Users/randeln/Documents/Zlatic_lab/close-loop/Notes/behavior_csv_stim_artefact/'
+    r"/Users/Nadine/Documents/Zlatic_lab/close-loop/Notes/behavior_csv_cl_A4/",
+    # r'/Users/Nadine/Documents/Zlatic_lab/close-loop/Notes/behavior_csv_cl_A9/',
+    # r'/Users/Nadine/Documents/Zlatic_lab/close-loop/Notes/behavior_csv_ol/',
+    # r'/Users/Nadine/Documents/Zlatic_lab/close-loop/Notes/behavior_csv_stim_artefact/'
 ]
 
 LIGHTMICROSOPE_DIRECTORIES = [
-    r"/Users/randeln/Documents/Zlatic_lab/close-loop/Notes/Basin_traces/",
-    r"/Users/randeln/Documents/Zlatic_lab/close-loop/Notes/Handle-like_Traces",
-    r"/Users/randeln/Documents/Zlatic_lab/close-loop/Notes/a00c_traces",
-    # r'/Users/randeln/Documents/Zlatic_lab/close-loop/Notes/candidate_neuron_traces'
+    r"/Users/Nadine/Documents/Zlatic_lab/close-loop/Notes/Basin_traces/",
+    r"/Users/Nadine/Documents/Zlatic_lab/close-loop/Notes/Handle-like_Traces",
+    r"/Users/Nadine/Documents/Zlatic_lab/close-loop/Notes/a00c_traces",
+    # r'/Users/Nadine/Documents/Zlatic_lab/close-loop/Notes/candidate_neuron_traces'
 ]
 
-TIMELAPSE_DIRECTORY = r"/Users/randeln/Documents/Zlatic_lab/close-loop/Notes/timelapse/"
+TIMELAPSE_DIRECTORY = r"/Users/Nadine/Documents/Zlatic_lab/close-loop/Notes/timelapse/"
 
 # If True: use time cache (create if it doesnt exist)
 # If False: create time cache whether it exists or not

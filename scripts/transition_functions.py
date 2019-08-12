@@ -299,3 +299,63 @@ def extract_transitions(sample_data, behavior_transitions):
         if transitions:
             found_transitions.append(transitions)
     return found_transitions
+
+
+def extract_transition_triples(
+    sample_data,
+    behavior_transition_triples,
+    first_trans_duration=None,
+    second_trans_duration=None,
+    third_trans_duration=None,
+):
+    found_transitions = []
+    for first_bt, second_bt in tqdm(behavior_transition_triples):
+        transitions = []
+        # This function should assume working input transition tripples, so the assert is redundent
+        assert first_bt.sample_id == second_bt.sample_id, "{} does not match {}".format(
+            first_bt.sample_id, second_bt.sample_id
+        )
+        sample_df = sample_data.get(first_bt.sample_id)
+        if sample_df is None:
+            raise ValueError("No data found for sample {}".format(bt.sample_id))
+        if not any(["bw" in column for column in sample_df.columns]):
+            continue
+        first_transitions = find_behavior_before(
+            first_bt.sample_id,
+            sample_df,
+            first_bt.event,
+            first_bt.post_event,
+            first_bt.max_delay,
+            first_event_duration=first_trans_duration,
+            second_event_duration=second_trans_duration,
+        )
+        second_transitions = find_behavior_before(
+            second_bt.sample_id,
+            sample_df,
+            second_bt.event,
+            second_bt.post_event,
+            second_bt.max_delay,
+            first_event_duration=second_trans_duration,
+            second_event_duration=third_trans_duration,
+        )
+        # print("{} transitions from {} to {}".format(len(first_transitions), first_bt.event, first_bt.post_event))
+        # print("{} transitions from {} to {}".format(len(second_transitions), second_bt.event, second_bt.post_event))
+
+        for ft in first_transitions:
+            for st in second_transitions:
+                if abs(ft["second_event_start"] - st["first_event_start"]) < 0.00001:
+                    transitions.append(
+                        {
+                            "sample_id": ft["sample_id"],
+                            "first_event_start": ft["first_event_start"],
+                            "first_event_end": ft["first_event_end"],
+                            "second_event_start": st["first_event_start"],
+                            "second_event_end": st["first_event_end"],
+                            "third_event_start": st["second_event_start"],
+                        }
+                    )
+        if transitions:
+            print("{} transition triples found".format(len(transitions)))
+            found_transitions.append(transitions)
+
+    return found_transitions
