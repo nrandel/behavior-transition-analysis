@@ -90,38 +90,27 @@ def plot_all_events(sample_data, cell_trace_configs):
         )
 
 
-def plot_windowed_events(all_events):
-    all_df = merge_dataframe_list(all_events, on="time", how="outer")
-
-    # Resets the index as time and drops time column (sollte spaeter kommen)
-    all_df.index = all_df["time"]
-    del all_df["time"]
-    # print(all_df)
-
-    # Index intepolation (linear interpolatione not on all_df, because index [=time] is not eaqually distributed)
-    int_all_df = all_df.interpolate(
-        method="index", axis=0, limit=None, inplace=False, limit_direction="both"
-    )
-    print(int_all_df.columns)
-
+def plot_windowed_events(df):
+    if len(df) == 0:
+        logging.warning("No data to plot!")
+        return
     # For single or multiple sample, aligned for certain event (no transitions taken into account).
     # Interpolated data used!
     # Averaged all events and all cells pro timepoint
     # Average for specific cell type filter-pattern (see below)
-    all_cell_avg_df = int_all_df.mean(axis=1)
-    all_cell_min_df = int_all_df.min(axis=1)
-    all_cell_max_df = int_all_df.max(axis=1)
-    # Standard deviation (distribution)
-    all_cell_std_df = int_all_df.std(axis=1)
-    # standard error of mean
-    all_cell_sem_df = int_all_df.sem(axis=1)
-    # print(all_cell_avg_df)
+
+    all_cell_avg_df = df.mean(axis=1)
+    all_cell_min_df = df.min(axis=1)
+    all_cell_max_df = df.max(axis=1)
+    all_cell_std_df = df.std(axis=1)
+    all_cell_sem_df = df.sem(axis=1)
+    logging.info("Ignores filterpattern in statistic calculations")
 
     fig = plt.figure()
 
     # Plot all cells from all_df, aligned at zero for event_start, specified in Cell_Trace_Config.
     sub1 = fig.add_subplot(211)
-    all_df.plot(ax=sub1, marker="*", label="A00C")
+    df.plot(ax=sub1, marker="*", label="A00C")
     aligned_layout_plot(sub1)
 
     sub2 = fig.add_subplot(212)

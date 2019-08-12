@@ -317,7 +317,7 @@ def extract_transition_triples(
         )
         sample_df = sample_data.get(first_bt.sample_id)
         if sample_df is None:
-            raise ValueError("No data found for sample {}".format(bt.sample_id))
+            raise ValueError("No data found for sample {}".format(first_bt.sample_id))
         if not any(["bw" in column for column in sample_df.columns]):
             continue
         first_transitions = find_behavior_before(
@@ -349,9 +349,13 @@ def extract_transition_triples(
                             "sample_id": ft["sample_id"],
                             "first_event_start": ft["first_event_start"],
                             "first_event_end": ft["first_event_end"],
+                            "first_event": ft["first_event"],
                             "second_event_start": st["first_event_start"],
                             "second_event_end": st["first_event_end"],
+                            "second_event": st["first_event"],
                             "third_event_start": st["second_event_start"],
+                            "third_event_end": st["second_event_end"],
+                            "third_event": st["second_event"],
                         }
                     )
         if transitions:

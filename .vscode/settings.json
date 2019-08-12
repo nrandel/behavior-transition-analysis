@@ -1,5 +1,5 @@
 {
-    "python.pythonPath": "/anaconda3/envs/behavior-analysis/bin/python",
+    "python.pythonPath": "/Users/nadine/anaconda3/envs/behavior-analysis/bin/python",
     "python.formatting.provider": "black",
     "python.linting.pylintEnabled": false,
     "python.linting.flake8Enabled": true,

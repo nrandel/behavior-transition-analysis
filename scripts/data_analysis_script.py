@@ -1,5 +1,5 @@
 import logging
-from functions import get_sample_data
+from functions import get_sample_data, merge_dataframe_list
 from classes import CellTraceConfig
 import numpy as np
 import pandas as pd
@@ -55,5 +55,14 @@ filtered_data = cell_trace_config_filter(sample_data, cell_trace_configs)
 
 if PLOT_EVERY_SAMPLE:
     plot_all_events(sample_data, cell_trace_configs)
+
+all_events_df = merge_dataframe_list(all_events, ordered=True, on="time", how="outer")
+
+all_events_df.index = all_events_df["time"]
+del all_events_df["time"]
+
+int_all_events_df = all_events_df.interpolate(
+    method="index", axis=0, limit=None, inplace=False, limit_direction="both"
+)
 
 plot_windowed_events(all_events)

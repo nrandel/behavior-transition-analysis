@@ -40,6 +40,8 @@ PLOT_EVERY_SAMPLE = True
 PLOT_TRANSITION_GAPS = False
 USE_CELL_PATTERN_FILTER = True
 
+FILTER_PATTERN = "A1R"
+
 """
 BEHAVIOR_TRANSITIONS = [
     PostBehaviorTransition("17-08-26L2-cl", "turn", "fw", 4.9),
@@ -55,17 +57,6 @@ BEHAVIOR_TRANSITIONS = (
     + [PostBehaviorTransition(name, "hunch", "stim", 4.9) for name in sample_data]
     + [PostBehaviorTransition(name, "other", "stim", 4.9) for name in sample_data]
 )
-
-TRANSITION_TRIPLES = [
-    (
-        PostBehaviorTransition(sample_id, "bw", "stim", 3),
-        PostBehaviorTransition(sample_id, "stim", "quiet", 3),
-    )
-    for sample_id in sample_data
-]
-FIRST_TRANS_DURATION = None
-SECOND_TRANS_DURATION = None
-THIRD_TRANS_DURATION = 2
 
 TRANSITION_TYPES = [
     TransitionType(first_event="fw"),
@@ -114,7 +105,7 @@ for sample in tqdm(found_transitions):
                 found_transition["sample_id"],
                 "basin",
                 found_transition["second_event_start"],
-                filter_pattern="A1R",
+                filter_pattern=FILTER_PATTERN,
                 first_event=found_transition["first_event"],
                 second_event=found_transition["second_event"],
             )
@@ -177,184 +168,7 @@ log_mann_whitney_u_test(
 )
 
 raise Exception("STOP HERE!")
-# %%
-# Triple transition
-# Find first and  second transition between two different! behaviors with intersection:
-# first event end = second event start, within a max_delay.
 
-# Open single samples
-"""
-first_transitions = [
-    PostBehaviorTransition('17-08-26L6-cl', 'fw', 'stim', 3)
-]
-second_transitions = [
-    PostBehaviorTransition('17-08-26L6-cl', 'stim', 'fw', 3)
-]
-"""
-# Open all samples
-
-found_transition_triples = extract_transition_triples(
-    sample_data,
-    TRANSITION_TRIPLES,
-    first_trans_duration=FIRST_TRANS_DURATION,
-    second_trans_duration=SECOND_TRANS_DURATION,
-    third_trans_duration=THIRD_TRANS_DURATION,
-)
-
-log_num_transitions(found_transition_triples)
-
-# TODO: Probably doesn't handle  triples properly
-plot_transition_gaps_hist(found_transition_triples)
-# %%
-# Use the predefined CellTransConfig to filter by celltype and pattern.
-# The results are merged_ordered and interpolated.
-cell_Ttrans_configs = []
-all_Ttrans_events = []
-
-# TODO: MAKE NEW SCRIPT FOR TRANSITION TRIPLES
-# TODO: MAKE NEW CLASS FOR CellTriplesTransConfig
-# TODO: CHANGE COLUMN RENAMING IN extract_windows TO USE ALL 3 EVENTS
-for sample in tqdm(found_transition_triples):
-    sample_ls_trans = []
-    for found_transition in sample:
-
-        # For all behavior
-        sample_ls_trans.append(found_transition["second_event_start"])
-        cell_Ttrans_configs.append(
-            CellTransConfig(
-                found_transition["sample_id"],
-                "A00c",
-                found_transition["second_event_start"],
-            )
-        )
-
-# Extract for specific time window and align several events.
-# Define timepoints pre and post an event (event_df).
-# This works for single sample or multiple samples aligned
-# Note: In cell_subset_df, time was set to index, because for the previous avg calculation
-# Add index and time = column
-
-# Set the window range left and right from the event (in seconds)
-left_half_window_size = 100.0
-right_half_window_size = 200.0
-
-all_Ttrans_windows = extract_windows(
-    sample_data,
-    cell_Ptrans_configs,
-    cell_pattern_filter=USE_CELL_PATTERN_FILTER,
-    left_half_window_size=left_half_window_size,
-    right_half_window_size=right_half_window_size,
-)
-
-# trans_df defined in pargraph before
-windows = []
-n_behavior = 0
-# TODO: Split filter columns and  extract windows
-for ctc in tqdm(cell_Ttrans_configs):
-    sample_df = sample_data.get(ctc.sample_id)
-    if sample_df is None:
-        raise ValueError("{}: could not find sample data".format(ctc.sample_id))
-        continue
-    # Extract columns matching our cell type and the optional filter pattern.
-    # Pandas' filter() operations works on columns for DataFrames by default.
-    cell_subset_df = sample_df.filter(
-        regex=ctc.get_filter_regex()
-    )  # Get subset of cells
-    cell_subset_df.set_index(
-        sample_df.time, inplace=True
-    )  # Set time to index (essential for min/max...)
-    cell_subset_df.reset_index(inplace=True)  # Add index and time = column
-    # print(cell_subset_df)
-
-    # Don't apply filter regex, but take all cells from lm_data
-    # cell_subset_df =  lm_data.get(ctc.sample_id)#Get subset of cells
-    # cell_subset_df.reset_index(inplace = True, drop = True) # Add index and time = column
-    # print(cell_subset_df)
-
-    n_behavior += 1
-    window_start = ctc.event_time - left_half_window_size
-    window_end = ctc.event_time + right_half_window_size
-
-    # Get subset of rows between window_start and window_end
-    trans = cell_subset_df[
-        (cell_subset_df.time >= window_start) & (cell_subset_df.time <= window_end)
-    ]
-    # Normalizing the data to align on beginning of selected
-    # behavior (event_df = Zero) by substracting events in window
-    # around start of event of interest from start of event interest.
-    # Note: using ":" in event.loc[] will select "all rows" in our window.
-    # trans.loc[:, 'time'] = trans['time'] - row['time']
-    trans.loc[:, "time"] = trans["time"] - ctc.event_time
-
-    # Add sample_id to each column as prefix and n_behavior as suffix to distinguish events within a sample
-    trans.rename(
-        lambda x: "{}_{}_{}".format(ctc.sample_id, x, n_behavior),
-        axis="columns",
-        inplace=True,
-    )
-
-    # Rename time collum to time
-    trans.rename(columns={trans.columns[0]: "time"}, inplace=True)
-    all_Ttrans_events.append(trans)  # Append a list with all event
-
-# Removes first event and takes it as left_window in pd.merge_ordered and iterates than through all_events
-all_Ttrans_df = all_Ttrans_events.pop(0)
-for right_df in all_Ttrans_events:
-    all_Ttrans_df = pd.merge_ordered(all_Ttrans_df, right_df, on="time", how="outer")
-
-# Resets the index as time and drops time column
-all_Ttrans_df.index = all_Ttrans_df["time"]
-del all_Ttrans_df["time"]
-# print(all_Ttrans_df)
-
-# Index intepolation (linear interpolatione not on all_df, because index [=time] is not eaqually distributed)
-int_all_Ttrans_df = all_Ttrans_df.interpolate(
-    method="index", axis=0, limit=None, inplace=False, limit_direction="both"
-)
-# print(int_all_Ttrans_df)
-# %%
-# Average and stddev, min, max, sem for post_behavior_transition events
-all_Ttrans_avg_df = int_all_Ttrans_df.mean(axis=1)  # Interpolated data used
-all_Ttrans_min_df = int_all_Ttrans_df.min(axis=1)
-all_Ttrans_max_df = int_all_Ttrans_df.max(axis=1)
-# Standard deviation (distribution)
-all_Ttrans_std_df = int_all_Ttrans_df.std(axis=1)
-# standard error of mean
-all_Ttrans_sem_df = int_all_Ttrans_df.sem(axis=1)
-# wrong zur haelfte: Want to have avg per celltyp over time point,
-# and not avg over all cells per timepoint
-
-# Plotting for multi-events (same_behavioral_transition)
-# If a dataframe with NANs is plotted (raw-data = non interpolated), use
-# marker = '+', or 'o', since the line in the lineplot only connects
-# consecutive data points
-def aligned_layout_plot(plot, tick_spacing=10, fov=(-20, 50, 0.0, 1.0), legend=False):
-    # Set fine x-axis scale
-    plot.xaxis.set_major_locator(ticker.MultipleLocator(tick_spacing))
-
-    # Set x and y limits and legend (default = False)
-    plot.axis(fov)
-    plot.legend().set_visible(legend)
-
-
-fig = plt.figure()
-
-# Plot all cells from all_df, aligned at zero for event_start, specified in Cell_Trace_Config.
-# sub1 = fig.add_subplot(211)
-# all_Ttrans_df.plot(ax=sub1, marker = '*', label = ctc.cell_type)
-# aligned_layout_plot(sub1)
-
-sub2 = fig.add_subplot(111)  # 212
-all_Ttrans_avg_df.plot(
-    ax=sub2, color="r", label=ctc.cell_type
-)  # use interpolated df to calculate average...
-# all_Ttrans_min_df.plot(ax=sub2, color = 'r', linewidth=1, alpha = 0.5)
-# all_Ttrans_max_df.plot(ax=sub2, color = 'r', linewidth=1, alpha = 0.5)
-all_Ttrans_avg_df.plot.line(
-    yerr=all_Ttrans_std_df, ax=sub2, color="lightgrey", alpha=0.1
-)
-# all_Ttrans_avg_df.plot.line(yerr=all_Ttrans_sem_df, ax=sub2, color = 'grey', alpha = 0.1)
-aligned_layout_plot(sub2)
 # %%
 # Open single sample
 
