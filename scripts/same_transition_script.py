@@ -4,14 +4,14 @@ import logging
 
 from functions import get_sample_data, merge_dataframe_list
 
-from transition_functions import extract_transition
+from transition_functions import extract_same_transitions
 
 from logging_functions import log_num_transitions
 
 from plotting_functions import plot_transition_gaps_hist, plot_windowed_events
 
 from classes.cell_triple_transition_config import CellTripleTransConfig, extract_windows
-from classes.post_behavior_transitions import PostBehaviorTransition
+from classes.post_behavior_transitions import SamePairBehaviorTransition
 
 
 sample_data = get_sample_data()
@@ -35,35 +35,31 @@ USE_CELL_PATTERN_FILTER = False
 
 # Open all samples
 
-found_transition_triples = extract_transition_triples(
+found_same_transitions = extract_same_transitions(
     sample_data,
-    TRANSITION_TRIPLES,
+    BEHAVIOR_TRANSITIONS,
     first_trans_duration=FIRST_TRANS_DURATION,
     second_trans_duration=SECOND_TRANS_DURATION,
-    third_trans_duration=THIRD_TRANS_DURATION,
 )
 
-log_num_transitions(found_transition_triples)
+log_num_transitions(found_same_transitions)
 
-# TODO: Probably doesn't handle  triples properly
-plot_transition_gaps_hist(found_transition_triples)
-# %%
-# Use the predefined CellTransConfig to filter by celltype and pattern.
-# The results are merged_ordered and interpolated.
-cell_Ttrans_configs = []
+plot_transition_gaps_hist(found_same_transitions)
+
+cell_Strans_configs = []
 all_Ttrans_events = []
 
 # TODO: MAKE NEW SCRIPT FOR TRANSITION TRIPLES
 # TODO: MAKE NEW CLASS FOR CellTriplesTransConfig
 # TODO: CHANGE COLUMN RENAMING IN extract_windows TO USE ALL 3 EVENTS
-for sample in tqdm(found_transition_triples):
+for sample in tqdm(found_same_transitions):
     sample_ls_trans = []
     for found_transition in sample:
         logging.info(found_transition)
 
         # For all behavior
         sample_ls_trans.append(found_transition["second_event_start"])
-        cell_Ttrans_configs.append(
+        cell_Strans_configs.append(
             CellTripleTransConfig(
                 found_transition["sample_id"],
                 "A00c",
@@ -87,7 +83,7 @@ right_half_window_size = 200.0
 
 all_Ttrans_windows = extract_windows(
     sample_data,
-    cell_Ttrans_configs,
+    cell_Strans_configs,
     cell_pattern_filter=USE_CELL_PATTERN_FILTER,
     left_half_window_size=left_half_window_size,
     right_half_window_size=right_half_window_size,
