@@ -47,7 +47,7 @@ log_num_transitions(found_same_transitions)
 plot_transition_gaps_hist(found_same_transitions)
 
 cell_Strans_configs = []
-all_Ttrans_events = []
+all_Strans_events = []
 
 # TODO: MAKE NEW SCRIPT FOR TRANSITION TRIPLES
 # TODO: MAKE NEW CLASS FOR CellTriplesTransConfig
