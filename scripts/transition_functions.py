@@ -130,7 +130,7 @@ def find_behavior_before(
     return results
 
 
-def find_behavior_next(
+def find_same_behavior_transitions(
     sample_id,
     sample_df,
     first_event,
@@ -287,6 +287,30 @@ def extract_transitions(sample_data, behavior_transitions):
         if sample_df is None:
             raise ValueError("No data found for sample {}".format(bt.sample_id))
         transitions = find_behavior_before(
+            bt.sample_id,
+            sample_df,
+            bt.event,
+            bt.post_event,
+            bt.max_delay,
+            first_event_duration=None,
+            second_event_duration=None,
+        )  # For 'quiet' change *_event_duration. Defaul = None.
+
+        if transitions:
+            found_transitions.append(transitions)
+    return found_transitions
+
+
+def extract_same_transitions(sample_data, behavior_transitions):
+    found_transitions = []
+    for bt in tqdm(behavior_transitions, "Extracting Transitions: "):
+        sample_df = sample_data.get(bt.sample_id)
+        # skip samples without behavior data
+        if not any(["bw" in column for column in sample_df.columns]):
+            continue
+        if sample_df is None:
+            raise ValueError("No data found for sample {}".format(bt.sample_id))
+        transitions = find_same_behavior_transitions(
             bt.sample_id,
             sample_df,
             bt.event,
