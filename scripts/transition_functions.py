@@ -1,5 +1,10 @@
 from tqdm import tqdm
 from functions import AVAILABLE_BEHAVIORS
+import logging
+
+
+# TODO: COMBINE `find_behavior_before` with find_same_behavior_transitions`
+# TODO: THESE SHOULD BE TESTED
 
 
 def find_behavior_before(
@@ -33,16 +38,20 @@ def find_behavior_before(
     second_event_end_time = None
 
     for i, row in sample_df.iterrows():
-        # Look for start of second behavior and remember its time.
-        if row[second_event_start_col] and not row[second_event_overlap_col]:
-            # print("{} starts at {}".format(second_event, row["time"]))
-            second_event_start_time = row["time"]
-        if row[first_event_end_col]:
-            # print("{} ends at {}".format(first_event, row["time"]))
-            first_event_end_time = row["time"]
         if row[first_event_start_col]:
-            # print("{} starts at {}".format(first_event, row["time"]))
             first_event_start_time = row["time"]
+            logging.warning(
+                "{} starts at {}".format(first_event, first_event_start_time)
+            )
+        if row[first_event_end_col] and first_event_start_time is not None:
+            first_event_end_time = row["time"]
+            logging.warning(
+                "{} ends at {}".format(first_event, first_event_end_time)
+            )
+        # Look for start of second behavior and remember its time.
+        if row[second_event_start_col] and first_event_start_time is not None:  # and not row[second_event_overlap_col]:
+            second_event_start_time = row["time"]
+            logging.warning("{} starts at {}".format(second_event, row["time"]))
         for column in sample_df.columns:
             if (
                 first_event_start_time is not None
@@ -54,7 +63,11 @@ def find_behavior_before(
                 and second_event not in column
             ):
                 if row[column]:
-                    # print("{} ended at {}, but then found {} at {}".format(first_event, first_event_end_time, column, row["time"]))
+                    logging.warning(
+                        "{} ended at {}, but then found {} at {}".format(
+                            first_event, first_event_end_time, column, row["time"]
+                        )
+                    )
                     first_event_start_time = None
                     first_event_end_time = None
                     second_event_start_time = None
@@ -71,13 +84,15 @@ def find_behavior_before(
 
         # Define rules for event_start_time and event_end_time
         if first_event_start_time > second_event_start_time:
+            logging.warning("first event start time is not less than second event start time")
             continue
         if first_event_start_time > first_event_end_time:
+            logging.warning("first event start time is not less than first event end time")
             continue
 
         # Test if first_event_start_time = second_event_start_time
         if abs(first_event_start_time - second_event_start_time) < 0.00001:
-            print(
+            logging.info(
                 "{}: start time (first) event {} and start time of (second) event {} are the same: {}".format(
                     sample_id, first_event, second_event, first_event_start_time
                 )
@@ -89,7 +104,7 @@ def find_behavior_before(
                     second_event_end_time = row["time"]
                     break
         if second_event_end_time is None:
-            print("warning: end time not found for second event")
+            logging.warning("end time not found for second event")
 
         # Test time between first event end and second event start. If it
         # is smaller than <max_delay>, store start of second event as result.
@@ -101,13 +116,24 @@ def find_behavior_before(
                 first_event_duration is not None
                 and first_event_end_time - first_event_start_time < first_event_duration
             ):
+                logging.warning("first event duration too short")
                 continue
             if (
                 second_event_duration is not None
                 and second_event_end_time - second_event_start_time
                 < second_event_duration
             ):
+                logging.warning("second event duration too short")
                 continue
+            logging.warning(
+                "found transition {}, first event {}-{}, second event: {}-{}".format(
+                    "-".join([first_event, second_event]),
+                    first_event_start_time,
+                    first_event_end_time,
+                    second_event_start_time,
+                    second_event_end_time,
+                )
+            )
 
             results.append(
                 {
@@ -120,6 +146,8 @@ def find_behavior_before(
                     "second_event": second_event,
                 }
             )
+        else:
+            logging.warning("delay too long")
 
         # Reset behavior tracking variables to find new pattern match.
         first_event_start_time = None
@@ -137,6 +165,8 @@ def find_same_behavior_transitions(
     second_event,
     max_delay=0,
     max_ignored_quiet_time=float("inf"),
+    first_event_duration=None,
+    second_event_duration=None,
 ):
     """For the data frame of a single sample <df>, find all behaviors
     of type <first_event> that will be followed by the same event <second_event>,
@@ -156,7 +186,14 @@ def find_same_behavior_transitions(
     Not in data sets identified
     """
 
-    print("finding same behaviors only")
+    assert first_event == second_event, "This function only works for same behaviors"
+
+    first_event_duration = (
+        first_event_duration if first_event_duration is not None else 0
+    )
+    second_event_duration = (
+        second_event_duration if second_event_duration is not None else 0
+    )
 
     results = []
     first_event_start_col = "{}_start".format(first_event)
@@ -194,7 +231,7 @@ def find_same_behavior_transitions(
         if row[second_event_end_col] and first_event_end_time is not None:
             second_event_end_time = row["time"]
 
-        if first_event_start_time:
+        if first_event_start_time is not None:
             if row["quiet_start"]:
                 quiet_event_start_time = row["time"]
             elif quiet_event_start_time is not None and row["quiet_end"]:
@@ -240,6 +277,10 @@ def find_same_behavior_transitions(
             continue
         if first_event_start_time > second_event_start_time:
             continue
+        if first_event_end_time - first_event_start_time < first_event_duration:
+            continue
+        if second_event_end_time - second_event_start_time < second_event_duration:
+            continue
 
         # Test time between first event end and second event start. If it
         # is smaller than <max_delay>, store start of second event as result.
@@ -255,10 +296,13 @@ def find_same_behavior_transitions(
                     "first_event_end": first_event_end_time,
                     "second_event_start": second_event_start_time,
                     "second_event_end": second_event_end_time,
+                    "first_event": first_event,
+                    "second_event": second_event,
                 }
             )
 
         # Reset behavior tracking variables to find new pattern match.
+        # THIS HANDLES SAME TRANSITION BEHAVIOR
         first_event_start_time = second_event_start_time
         first_event_end_time = second_event_end_time
         second_event_start_time = None
@@ -277,7 +321,12 @@ def get_unrelated_nonquiet_behaviors(excluding=[]):
     return [ab for ab in AVAILABLE_BEHAVIORS if ab not in excluding]
 
 
-def extract_transitions(sample_data, behavior_transitions):
+def extract_transitions(
+    sample_data,
+    behavior_transitions,
+    first_event_duration=None,
+    second_event_duration=None,
+):
     found_transitions = []
     for bt in tqdm(behavior_transitions, "Extracting Transitions: "):
         sample_df = sample_data.get(bt.sample_id)
@@ -292,8 +341,8 @@ def extract_transitions(sample_data, behavior_transitions):
             bt.event,
             bt.post_event,
             bt.max_delay,
-            first_event_duration=None,
-            second_event_duration=None,
+            first_event_duration=first_event_duration,
+            second_event_duration=second_event_duration,
         )  # For 'quiet' change *_event_duration. Defaul = None.
 
         if transitions:
@@ -301,11 +350,15 @@ def extract_transitions(sample_data, behavior_transitions):
     return found_transitions
 
 
-def extract_same_transitions(sample_data, behavior_transitions):
+def extract_same_transitions(
+    sample_data,
+    behavior_transitions,
+    first_event_duration=None,
+    second_event_duration=None,
+):
     found_transitions = []
-    for bt in tqdm(behavior_transitions, "Extracting Transitions: "):
+    for bt in tqdm(behavior_transitions, "Extracting Same Transitions: "):
         sample_df = sample_data.get(bt.sample_id)
-        # skip samples without behavior data
         if not any(["bw" in column for column in sample_df.columns]):
             continue
         if sample_df is None:
@@ -313,12 +366,13 @@ def extract_same_transitions(sample_data, behavior_transitions):
         transitions = find_same_behavior_transitions(
             bt.sample_id,
             sample_df,
+            bt.pre_event,
             bt.event,
-            bt.post_event,
             bt.max_delay,
-            first_event_duration=None,
-            second_event_duration=None,
-        )  # For 'quiet' change *_event_duration. Defaul = None.
+            bt.max_ignored_quiet_time,
+            first_event_duration=first_event_duration,
+            second_event_duration=second_event_duration,
+        )
 
         if transitions:
             found_transitions.append(transitions)

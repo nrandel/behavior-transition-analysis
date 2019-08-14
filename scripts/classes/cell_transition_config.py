@@ -42,7 +42,7 @@ def extract_windows(
     cell_transition_configs,
     left_half_window_size=18.4,
     right_half_window_size=42.4,
-    cell_pattern_filter = True,
+    cell_pattern_filter=True,
 ):
     # trans_df defined in pargraph before
     all_Ptrans_events = []
@@ -57,16 +57,17 @@ def extract_windows(
             raise ValueError("{}: could not find sample data".format(ctc.sample_id))
             continue
 
-        # TODO make regex optional and filter out behavior
-
         # TODO: make extracting behavior / cell columns easy and accessable anywhere
         all_columns = set(sample_df.columns)
-        behavior_columns = set(
+        non_cell_columns = set(
             column
             for column in all_columns
-            if any(behavior in column for behavior in AVAILABLE_BEHAVIORS + ("quiet",))
+            if any(
+                behavior in column
+                for behavior in AVAILABLE_BEHAVIORS + ("quiet", "time")
+            )
         )
-        cell_df = sample_df.filter(items=all_columns - behavior_columns)
+        cell_df = sample_df.filter(items=all_columns - non_cell_columns)
         if cell_pattern_filter:
             cell_subset_df = cell_df.filter(regex=ctc.get_filter_regex())
         else:

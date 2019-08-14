@@ -1,3 +1,5 @@
+# TODO: COMBINE THESE TWO ALLONG WITH `find_behavior_before` and `find_same_behavior_transitions`
+
 class PostBehaviorTransition:
     # TODO: maybe use max_ignored_quite_time
     def __init__(self, sample_id, event, post_event, max_delay=0):
